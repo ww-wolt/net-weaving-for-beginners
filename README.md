@@ -1,4 +1,4 @@
-![Net Weaving for Beginners](_media/IMG_DSC6755.jpg)
+![Net Weaving for Beginners](_docs/IMG_DSC6755.jpg)
 
 # Net Weaving for Beginners
 
