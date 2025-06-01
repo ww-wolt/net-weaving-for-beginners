@@ -66,12 +66,15 @@ void loop() {
 }
 
 void measureKeyboard(){
+
+  unsigned long t0 = millis();
+
   // String buffer;
 
   // Measure A -> B
-  digitalWrite(DIGITAL_OUT_A, HIGH);
-  digitalWrite(DIGITAL_OUT_B, LOW); 
-  delayMicroseconds(50); 
+//   digitalWrite(DIGITAL_OUT_A, HIGH);
+//   digitalWrite(DIGITAL_OUT_B, LOW); 
+//   delayMicroseconds(50); 
 
   for (int pinA = 0; pinA <= 25; pinA++) {
     selectKeyboardPin('A', pinA);
@@ -80,9 +83,10 @@ void measureKeyboard(){
       
       selectKeyboardPin('B', pinB);
 
-      delayMicroseconds(100); 
+      delayMicroseconds(50); 
 
-      int analogValB = analogReadAvg(ANALOG_IN_B);
+      // int analogValB = analogReadAvg(ANALOG_IN_B);
+      int analogValB = analogRead(ANALOG_IN_B);
       Serial.print(analogValB);
       Serial.print(",");
     }
@@ -112,9 +116,15 @@ void measureKeyboard(){
   //   }
   // }
 
+  unsigned long t1 = millis();
+  // Serial.println(t1 - t0);
+
   Serial.println(",0");
 }
 
+CD74HC4067* muxes = nullptr;
+int mux1Enable = -1;
+int mux2Enable = -1;
 
 void selectKeyboardPin(char muxGroup, int pin){
   if(pin < 0 || pin > 25) {
@@ -122,10 +132,8 @@ void selectKeyboardPin(char muxGroup, int pin){
     return;
   }
 
-
-  CD74HC4067* muxes = nullptr;
-  int mux1Enable = -1;
-  int mux2Enable = -1;
+  mux1Enable = -1;
+  mux2Enable = -1;
 
   if (muxGroup == 'A'){
     muxes = &muxesA;
