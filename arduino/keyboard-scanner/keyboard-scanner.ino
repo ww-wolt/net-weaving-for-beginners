@@ -218,7 +218,7 @@ void loop() {
 }
 
 void measureKeyboardFromMap() {
-  unsigned long t0 = millis();
+  // unsigned long t0 = millis();
 
   int lastPinA = -1;
   int lastPinB = -1;
@@ -270,8 +270,8 @@ void measureKeyboardFromMap() {
     currentKeyState.keyIndex = -1;
   }
 
-  unsigned long t1 = millis();
-  Serial.println(t1 - t0);
+  // unsigned long t1 = millis();
+  // Serial.println(t1 - t0);
 }
 
 CD74HC4067* muxes = nullptr;
