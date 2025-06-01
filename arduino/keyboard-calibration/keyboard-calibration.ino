@@ -104,7 +104,7 @@ void measureKeyboard(){
         Serial.print(pinA);
         Serial.print(", ");
         Serial.print(pinB);
-        Serial.print(", \"?\"}");
+        Serial.print(", \"?\"},");
         Serial.println();
       }
     }

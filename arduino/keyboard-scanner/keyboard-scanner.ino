@@ -1,10 +1,45 @@
+#include <CD74HC4067.h>
+#include <Arduino.h>
+
+#define ANALOG_IN_A 0
+#define ANALOG_IN_B 1
+
+#define DIGITAL_OUT_A 2
+#define DIGITAL_OUT_B 3
+
+#define MUX_A1_ENABLE 23
+#define MUX_A2_ENABLE 22
+#define MUX_B1_ENABLE 6
+#define MUX_B2_ENABLE 7
+
+#define UART_TX 999
+
+CD74HC4067 muxesA(21,20,19,18);
+CD74HC4067 muxesB(9,8,15,14);
+
+
 struct KeyMapping {
   int pinA;
   int pinB;
   const char* symbol;  // Use strings for normal chars and special keys
 };
 
-// Example list with normal keys and special keys as strings
+// Key repeat state tracking
+struct KeyState {
+  bool isPressed;
+  unsigned long pressStartTime;
+  unsigned long lastRepeatTime;
+  bool hasRepeated;
+  int keyIndex;
+};
+
+// Repeat timing constants (in milliseconds)
+const unsigned long INITIAL_REPEAT_DELAY = 500;  // 500ms before first repeat
+const unsigned long REPEAT_INTERVAL = 60;        // 60ms between repeats (~17 chars/sec)
+
+// Key state tracking
+KeyState currentKeyState = {false, 0, 0, false, -1};
+
 KeyMapping keyboardMap[] = {
     {8, 23, "1"},
     {23, 8, "1"},
@@ -116,44 +151,48 @@ KeyMapping keyboardMap[] = {
     {19, 0, "DOWN_ARROW"},
 };
 
-
-
-#include <CD74HC4067.h>
-#include <Arduino.h>
-
-#define ANALOG_IN_A 0
-#define ANALOG_IN_B 1
-
-#define DIGITAL_OUT_A 2
-#define DIGITAL_OUT_B 3
-
-#define MUX_A1_ENABLE 23
-#define MUX_A2_ENABLE 22
-#define MUX_B1_ENABLE 6
-#define MUX_B2_ENABLE 7
-
-#define UART_TX 999
-
-CD74HC4067 muxesA(21,20,19,18);
-CD74HC4067 muxesB(9,8,15,14);
-
-int analogReadAvg(int pin, int samples = 2) {
-  long total = 0;
-  for (int i = 0; i < samples; ++i) {
-    total += analogRead(pin);
-  }
-  return total / samples;
+bool shouldKeyRepeat(const char* symbol) {
+  // Define which keys should repeat when held
+  // Return false for modifier keys that shouldn't repeat
+  return !(strcmp(symbol, "SHIFT") == 0 || 
+           strcmp(symbol, "CTRL") == 0 || 
+           strcmp(symbol, "ALT") == 0 || 
+           strcmp(symbol, "ALT_GR") == 0);
 }
 
+void handleKeyRepeat() {
+  if (!currentKeyState.isPressed) {
+    return; // No key is currently pressed
+  }
+  
+  unsigned long currentTime = millis();
+  unsigned long pressDuration = currentTime - currentKeyState.pressStartTime;
+  
+  // Check if we should start repeating
+  if (!currentKeyState.hasRepeated && pressDuration >= INITIAL_REPEAT_DELAY) {
+    // First repeat after initial delay
+    if (shouldKeyRepeat(keyboardMap[currentKeyState.keyIndex].symbol)) {
+      Serial.println(keyboardMap[currentKeyState.keyIndex].symbol);
+      currentKeyState.hasRepeated = true;
+      currentKeyState.lastRepeatTime = currentTime;
+    }
+  }
+  // Check if we should continue repeating
+  else if (currentKeyState.hasRepeated && 
+           (currentTime - currentKeyState.lastRepeatTime) >= REPEAT_INTERVAL) {
+    if (shouldKeyRepeat(keyboardMap[currentKeyState.keyIndex].symbol)) {
+      Serial.println(keyboardMap[currentKeyState.keyIndex].symbol);
+      currentKeyState.lastRepeatTime = currentTime;
+    }
+  }
+}
 
 void setup() {
-
   // Initialize Digital Output Pins
   pinMode(DIGITAL_OUT_A, OUTPUT);
   pinMode(DIGITAL_OUT_B, OUTPUT);
   digitalWrite(DIGITAL_OUT_A, HIGH);
   digitalWrite(DIGITAL_OUT_B, LOW);
-
 
   // Initialize MUX enable pins
   pinMode(MUX_A1_ENABLE, OUTPUT);
@@ -175,11 +214,16 @@ void setup() {
 
 void loop() {
   measureKeyboardFromMap();
+  handleKeyRepeat();
 }
 
 void measureKeyboardFromMap() {
+  unsigned long t0 = millis();
+
   int lastPinA = -1;
   int lastPinB = -1;
+  bool keyCurrentlyPressed = false;
+  int pressedKeyIndex = -1;
 
   const int mapSize = sizeof(keyboardMap) / sizeof(KeyMapping);
 
@@ -202,11 +246,33 @@ void measureKeyboardFromMap() {
 
     int adcValue = analogRead(ANALOG_IN_B);
     if (adcValue > 2200) {
-      Serial.println(k.symbol);  // Print just the symbol
+      keyCurrentlyPressed = true;
+      pressedKeyIndex = i;
+      
+      // Check if this is a new key press
+      if (!currentKeyState.isPressed || currentKeyState.keyIndex != i) {
+        // New key press - send immediately and start tracking
+        Serial.println(k.symbol);
+        currentKeyState.isPressed = true;
+        currentKeyState.pressStartTime = millis();
+        currentKeyState.lastRepeatTime = 0;
+        currentKeyState.hasRepeated = false;
+        currentKeyState.keyIndex = i;
+      }
+      
+      break; // Only handle one key at a time
     }
   }
-}
+  
+  // If no key is pressed, reset the state
+  if (!keyCurrentlyPressed && currentKeyState.isPressed) {
+    currentKeyState.isPressed = false;
+    currentKeyState.keyIndex = -1;
+  }
 
+  unsigned long t1 = millis();
+  Serial.println(t1 - t0);
+}
 
 CD74HC4067* muxes = nullptr;
 int mux1Enable = -1;
