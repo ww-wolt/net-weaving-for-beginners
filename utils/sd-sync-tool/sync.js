@@ -4,59 +4,107 @@ const path = require('path');
 const drivelist = require('drivelist');
 
 const localFolder = path.resolve(__dirname, '../../arduino/computer/_SD');
-const sdCardLabel = 'NetWeaving';
+const sdCardLabel = 'NET_WEAVING';
 
 let sdCardPath = null;
+let previousSdCardPath = null;
+let lastSdCardFound = null; // Track if SD card was found last check
 
+// 🔍 Find SD card mount point without logging here
 async function findSdCardPath() {
     const drives = await drivelist.list();
+
     for (const drive of drives) {
-        // Some platforms put label in drive.label, some in drive.description
-        if (drive.label === sdCardLabel || drive.description.includes(sdCardLabel)) {
-            for (const mount of drive.mountpoints) {
+        if (!drive.isRemovable || !drive.isCard || !drive.mountpoints.length) continue;
+
+        for (const mount of drive.mountpoints) {
+            if (mount.label && mount.label.toUpperCase() === sdCardLabel.toUpperCase()) {
                 return mount.path;
             }
         }
     }
+
     return null;
 }
 
+// 📂 Sync a single file to SD card
 async function syncFileToSD(filePath) {
-    if (!sdCardPath) return; // safety check
+    if (!sdCardPath) {
+        console.warn(`⚠️ SD card not connected. Skipping: ${path.relative(localFolder, filePath)}`);
+        return;
+    }
 
     const relativePath = path.relative(localFolder, filePath);
     const destPath = path.join(sdCardPath, relativePath);
 
     try {
-        // Copy file/folder if changed or new
-        await fs.copy(filePath, destPath, { overwrite: true, errorOnExist: false });
-        console.log(`✅ Copied to SD: ${relativePath}`);
+        await fs.copy(filePath, destPath, { overwrite: true });
+        console.log(`📥 Synced file: ${relativePath}`);
     } catch (err) {
-        console.warn(`❌ Failed to copy to SD: ${relativePath} - ${err.message}`);
+        console.warn(`❌ Failed to sync file: ${relativePath} - ${err.message}`);
     }
 }
 
-// Watch local folder for new or changed files, then sync to SD
+// 🔄 Sync the entire local folder to SD
+async function syncAllToSD() {
+    if (!sdCardPath) {
+        console.warn('⚠️ SD card not connected. Full sync skipped.');
+        return;
+    }
+
+    try {
+        await fs.copy(localFolder, sdCardPath, { overwrite: true });
+        console.log('✅ Full folder sync complete.');
+    } catch (err) {
+        console.error(`❌ Full sync failed: ${err.message}`);
+    }
+}
+
+// 👀 Watch local folder for changes
 const localWatcher = chokidar.watch(localFolder, { ignoreInitial: true });
-localWatcher.on('add', (path) => {
-    if (sdCardPath) syncFileToSD(path);
-});
-localWatcher.on('change', (path) => {
-    if (sdCardPath) syncFileToSD(path);
+
+localWatcher.on('add', (filePath) => {
+    syncFileToSD(filePath);
 });
 
-// Poll every 3 seconds for the SD card presence
-setInterval(async () => {
+localWatcher.on('change', (filePath) => {
+    syncFileToSD(filePath);
+});
+
+// 🔁 Check for SD card connection and sync accordingly
+async function checkSdCard() {
     const foundPath = await findSdCardPath();
 
     if (foundPath && !sdCardPath) {
-        console.log(`📀 SD card "NetWeaving" detected at ${foundPath}`);
-        sdCardPath = foundPath; // syncing directly to root, change if needed
+        console.log(`📀 SD card connected at ${foundPath}`);
+        sdCardPath = foundPath;
+        previousSdCardPath = foundPath;
+        lastSdCardFound = true;
         await fs.ensureDir(sdCardPath);
+        await syncAllToSD();
     } else if (!foundPath && sdCardPath) {
-        console.log('📀 SD card "NetWeaving" removed.');
+        console.log(`🔌 SD card removed.`);
         sdCardPath = null;
+        previousSdCardPath = null;
+        lastSdCardFound = false;
+    } else if (foundPath && foundPath !== previousSdCardPath) {
+        console.log(`🔁 SD card mount point changed: ${foundPath}`);
+        sdCardPath = foundPath;
+        previousSdCardPath = foundPath;
+        lastSdCardFound = true;
+        await fs.ensureDir(sdCardPath);
+        await syncAllToSD();
+    } else if (!foundPath && lastSdCardFound !== false) {
+        // Log missing card only once when status changes
+        console.log(`⚠️ SD card "${sdCardLabel}" not found or not mounted.`);
+        lastSdCardFound = false;
     }
-}, 3000);
+}
 
-console.log(`🔁 Watching local folder: ${localFolder} (one-way sync to SD card "${sdCardLabel}")`);
+// 🕒 Poll for SD card changes every 2 seconds
+setInterval(checkSdCard, 2000);
+
+// ▶️ Run immediately at startup
+checkSdCard();
+
+console.log(`👁️ Watching local folder: ${localFolder}`);
