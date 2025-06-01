@@ -6,6 +6,15 @@
 // - Print out directly struct code, copy paste into keyboard
 // - Send data over UART serial to other esp32
 
+
+struct KeyMapping {
+  int pinA;
+  int pinB;
+  const char* symbol;  // points to flash string literals
+};
+
+
+
 #include <CD74HC4067.h>
 #include <Arduino.h>
 
@@ -67,7 +76,7 @@ void loop() {
 
 void measureKeyboard(){
 
-  unsigned long t0 = millis();
+  // unsigned long t0 = millis();
 
   // String buffer;
 
@@ -82,44 +91,25 @@ void measureKeyboard(){
       if (pinB == pinA) continue;
       
       selectKeyboardPin('B', pinB);
+      delayMicroseconds(500); 
 
-      delayMicroseconds(50); 
+  
+      // int analogValB = analogRead(ANALOG_IN_B);
+      // Serial.print(analogValB);
+      // Serial.print(",");
 
-      // int analogValB = analogReadAvg(ANALOG_IN_B);
-      int analogValB = analogRead(ANALOG_IN_B);
-      Serial.print(analogValB);
-      Serial.print(",");
+      int adcValue = analogRead(ANALOG_IN_B);
+      if (adcValue > 2000) {
+        Serial.print("{");
+        Serial.print(pinA);
+        Serial.print(", ");
+        Serial.print(pinB);
+        Serial.print(", \"?\"}");
+        Serial.println();
+      }
     }
   }
-
-  // Superflous, can be removed as we already reverse pin orders in first loop
-
-  // Measure B -> A
-  // digitalWrite(DIGITAL_OUT_A, LOW);
-  // digitalWrite(DIGITAL_OUT_B, HIGH); 
-  // delayMicroseconds(50); 
-
-  // for (int pinA = 0; pinA <= 25; pinA++) {
-  //   selectKeyboardPin('A', pinA);
-  //   for (int pinB = 0; pinB <= 25; pinB++) {
-  //     if (pinB == pinA) continue;
-
-  //     selectKeyboardPin('B', pinB);
-
-  //     delayMicroseconds(50); 
-
-      
-
-  //     int analogValB = analogReadAvg(ANALOG_IN_B);
-  //     Serial.print(analogValB);
-  //     Serial.print(",");
-  //   }
-  // }
-
-  unsigned long t1 = millis();
-  // Serial.println(t1 - t0);
-
-  Serial.println(",0");
+  // Serial.println(",0");
 }
 
 CD74HC4067* muxes = nullptr;
@@ -127,6 +117,10 @@ int mux1Enable = -1;
 int mux2Enable = -1;
 
 void selectKeyboardPin(char muxGroup, int pin){
+
+  // unsigned long t0 = millis();
+  
+  
   if(pin < 0 || pin > 25) {
     Serial.println("ERROR: Invalid pin number");
     return;
@@ -155,5 +149,58 @@ void selectKeyboardPin(char muxGroup, int pin){
     digitalWrite(mux2Enable, LOW); // Deactivate mux 2
     muxes->channel(pin - 13); // Select channel 0-12 on mux 2 (for pins 13-25)
   }
+
+  // unsigned long t1 = millis();
+  // Serial.println(t1 - t0);
+  
 }
+
+// char lastMuxA = 'X'; // '1' or '2'
+// char lastMuxB = 'X'; // '1' or '2'
+
+// void selectKeyboardPin(char muxGroup, int pin) {
+//   if (pin < 0 || pin > 25) {
+//     Serial.println("ERROR: Invalid pin number");
+//     return;
+//   }
+
+//   CD74HC4067* muxes = nullptr;
+//   int mux1Enable = -1;
+//   int mux2Enable = -1;
+//   char* lastMux = nullptr;
+//   char currentMux;
+
+//   // Set up based on group
+//   if (muxGroup == 'A') {
+//     muxes = &muxesA;
+//     mux1Enable = MUX_A1_ENABLE;
+//     mux2Enable = MUX_A2_ENABLE;
+//     lastMux = &lastMuxA;
+//   } else if (muxGroup == 'B') {
+//     muxes = &muxesB;
+//     mux1Enable = MUX_B1_ENABLE;
+//     mux2Enable = MUX_B2_ENABLE;
+//     lastMux = &lastMuxB;
+//   } else {
+//     Serial.println("ERROR: Invalid mux group");
+//     return;
+//   }
+
+//   if (pin < 13) {
+//     currentMux = '1';
+//     if (*lastMux != currentMux) delay(1); // Only delay if switching
+//     digitalWrite(mux1Enable, LOW);  // Enable MUX 1
+//     digitalWrite(mux2Enable, HIGH); // Disable MUX 2
+//     muxes->channel(pin);
+//   } else {
+//     currentMux = '2';
+//     if (*lastMux != currentMux) delay(1); // Only delay if switching
+//     digitalWrite(mux1Enable, HIGH); // Disable MUX 1
+//     digitalWrite(mux2Enable, LOW);  // Enable MUX 2
+//     muxes->channel(pin - 13);
+//   }
+
+//   *lastMux = currentMux; // Update last used mux
+// }
+
 
