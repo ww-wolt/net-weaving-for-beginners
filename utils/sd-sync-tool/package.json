@@ -1,0 +1,15 @@
+{
+  "name": "sd-sync-tool",
+  "version": "1.0.0",
+  "main": "sync.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jonas Wolter",
+  "description": "",
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "drivelist": "^12.0.2",
+    "fs-extra": "^11.3.0"
+  }
+}
