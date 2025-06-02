@@ -11,8 +11,8 @@ Github repository documenting all technical aspects of the speculative design pr
    Detailed technical documentation of the project, with all information required to exhibit the project.
 2. [Arduino Code](arduino)  
     The Arduino code for the project, which is used to control the LCD display and the SD card reader. Running on an [EP32 C6 Pico   by WaveShare](https://www.waveshare.com/wiki/ESP32-C6-Pico).
-3. [Fritzing Diagrams](_docs/fritzing)  
-   Electronic schematics and wiring diagrams for the project, created with Fritzing.
+3. [Circuit Diagrams](_docs/circuit_diagrams.pdf)  
+   Sketches of the electronic circuits used in the project, showing how the components are connected.
 
 ## Project Description
 
